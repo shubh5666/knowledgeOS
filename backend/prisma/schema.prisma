@@ -1,0 +1,97 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+
+model User {
+  id            String   @id @default(uuid())
+  name          String
+  email         String   @unique
+  password      String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  organizations Organization[]
+}
+
+
+model Organization {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  ownerId     String
+  owner       User @relation(fields: [ownerId], references: [id])
+
+  workspaces  Workspace[]
+}
+
+
+
+model Workspace {
+  id             String   @id @default(uuid())
+  name           String
+  description    String?
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  documents      Document[]
+}
+
+
+model Document {
+  id          String   @id @default(uuid())
+  title       String
+  fileName    String
+  fileType    String
+  filePath    String
+
+  status      String   @default("UPLOADED")
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  chunks      DocumentChunk[]
+  chats       Chat[]
+}
+
+
+model DocumentChunk {
+  id         String   @id @default(uuid())
+  content    String
+  chunkIndex Int
+
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id])
+
+  createdAt  DateTime @default(now())
+}
+
+
+model Chat {
+
+  id         String   @id @default(uuid())
+
+  question   String
+
+  answer     String
+
+  createdAt  DateTime @default(now())
+
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id])
+
+}
