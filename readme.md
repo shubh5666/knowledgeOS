@@ -1,6 +1,6 @@
 # KnowledgeOS
 
-KnowledgeOS is an AI-powered document management platform that helps users organize their documents and quickly find information using natural language.
+KnowledgeOS is an AI-powered documents management platform that helps users organize their documents and quickly find information using natural language.
 
 In many organizations and teams, important information is stored in PDF documents such as reports, documentation, meeting notes, policies, and technical guides. Finding a specific piece of information usually means opening multiple files and reading through them manually, which takes time.
 
