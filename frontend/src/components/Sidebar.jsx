@@ -167,7 +167,7 @@ export default function Sidebar({
     <aside className="sidebar">
       {/* Brand Header */}
       <div className="sidebar-brand">
-        <Building2 size={22} className="sidebar-section-btn" style={{ color: "var(--accent-light)" }} />
+        <Building2 size={22} style={{ color: "var(--text-main)" }} />
         <span>KnowledgeOS</span>
       </div>
 

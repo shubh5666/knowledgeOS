@@ -88,10 +88,14 @@ const processDocument = async (req, res) => {
             },
         }));
 
-        await qdrant.upsert("document_chunks", {
-            wait: true,
-            points,
-        });
+        try {
+            await qdrant.upsert("document_chunks", {
+                wait: true,
+                points,
+            });
+        } catch (qdrantErr) {
+            console.warn("⚠️ Warning: Qdrant upsert failed, continuing with database chunks:", qdrantErr.message);
+        }
 
         await prisma.document.update({
             where: { id: documentId },

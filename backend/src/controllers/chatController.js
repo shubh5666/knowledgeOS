@@ -19,33 +19,46 @@ const chat = async (req, res) => {
         const { documentId } = req.params;
         const { question } = req.body;
 
-        const embedding = await generateEmbedding(question);
-
-        const result = await qdrant.query("document_chunks", {
-            query: embedding,
-            limit: 5,
-            withPayload: true,
-            filter: {
-                must: [
-                    {
-                        key: "documentId",
-                        match: {
-                            value: documentId,
+        let chunkIds = [];
+        try {
+            const embedding = await generateEmbedding(question);
+            const result = await qdrant.query("document_chunks", {
+                query: embedding,
+                limit: 5,
+                withPayload: true,
+                filter: {
+                    must: [
+                        {
+                            key: "documentId",
+                            match: {
+                                value: documentId,
+                            },
                         },
-                    },
-                ],
-            },
-        });
-
-        const chunkIds = result.points.map((point) => point.id);
-
-        const chunks = await prisma.documentChunk.findMany({
-            where: {
-                id: {
-                    in: chunkIds,
+                    ],
                 },
-            },
-        });
+            });
+            chunkIds = result.points.map((point) => point.id);
+        } catch (qdrantErr) {
+            console.warn("⚠️ Warning: Qdrant query failed, falling back to database chunks:", qdrantErr.message);
+        }
+
+        let chunks = [];
+        if (chunkIds.length > 0) {
+            chunks = await prisma.documentChunk.findMany({
+                where: {
+                    id: {
+                        in: chunkIds,
+                    },
+                },
+            });
+        } else {
+            // Fallback: load first 8 chunks of the document directly from database
+            chunks = await prisma.documentChunk.findMany({
+                where: { documentId },
+                take: 8,
+                orderBy: { chunkIndex: "asc" },
+            });
+        }
 
         const context = chunks
             .map((chunk) => chunk.content)

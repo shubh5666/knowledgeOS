@@ -14,7 +14,7 @@
   /* Primary Brand & Accents */
   --accent-black: #111111;     /* Deep obsidian / primary button */
   --accent-pure-black: #000000;
-  --accent-light: #252a30;     /* Dark charcoal secondary accent */
+  --accent-light: #111111;     /* Deep obsidian accent */
   --accent-glow: rgba(17, 17, 17, 0.06);
   --hero-card-bg: radial-gradient(circle at 12% 10%, rgba(255, 255, 255, 0.035), transparent 28%), #111111;
 
@@ -323,9 +323,9 @@ body {
 }
 
 .doc-status-badge.processing {
-  background: #eff6ff;
-  color: #1d4ed8;
-  border: 1px solid #bfdbfe;
+  background: #f0f2f4;
+  color: var(--text-main);
+  border: 1px solid var(--border-subtle);
 }
 
 /* =========================================================
@@ -427,6 +427,10 @@ body {
   letter-spacing: -0.02em;
 }
 
+.sidebar-brand svg {
+  color: var(--text-main) !important;
+}
+
 .sidebar-scrollable {
   flex: 1;
   overflow-y: auto;
@@ -515,6 +519,10 @@ body {
   font-weight: 750;
   border-color: var(--border-subtle);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.sidebar-nav-item.active svg {
+  color: var(--text-main) !important;
 }
 
 .org-selector-container {
