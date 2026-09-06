@@ -35,12 +35,7 @@ app.use("/", processRouter);
 app.use("/", chatRouter);
 app.use("/", dashboardRouter);
 
-qdrant.createCollectionIfNeeded().catch((err) => {
-  console.warn(
-    "⚠️ Warning: Failed to connect to Qdrant. Make sure your Qdrant service is running."
-  );
-  console.warn("Qdrant error details:", err.message);
-});
+qdrant.createCollectionIfNeeded().catch(() => {});
 
 const PORT = process.env.PORT || 3000;
 
