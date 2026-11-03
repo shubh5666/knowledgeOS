@@ -1,4 +1,3 @@
-
 const prisma = require("../config/database");
 const { deleteWorkspaceInternal } = require("./workspaceController");
 
@@ -47,15 +46,15 @@ const getAll = async (req, res) => {
 
 const deleteOrganizationInternal = async (orgId) => {
     const workspaces = await prisma.workspace.findMany({
-        where: { organizationId: orgId }
+        where: { organizationId: orgId },
     });
-    
+
     for (const ws of workspaces) {
         await deleteWorkspaceInternal(ws.id);
     }
-    
+
     return await prisma.organization.delete({
-        where: { id: orgId }
+        where: { id: orgId },
     });
 };
 
@@ -63,20 +62,20 @@ const remove = async (req, res) => {
     try {
         const { organizationId } = req.params;
         const org = await prisma.organization.findUnique({
-            where: { id: organizationId }
+            where: { id: organizationId },
         });
 
         if (!org) {
             return res.status(404).json({
                 success: false,
-                message: "Organization not found"
+                message: "Organization not found",
             });
         }
 
         if (org.ownerId !== req.user.id) {
             return res.status(403).json({
                 success: false,
-                message: "Unauthorized: You do not own this organization"
+                message: "Unauthorized: You do not own this organization",
             });
         }
 
@@ -84,12 +83,13 @@ const remove = async (req, res) => {
 
         res.status(200).json({
             success: true,
-            message: "Organization deleted successfully"
+            message: "Organization deleted successfully",
         });
+
     } catch (err) {
         res.status(400).json({
             success: false,
-            message: err.message
+            message: err.message,
         });
     }
 };

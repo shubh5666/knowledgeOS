@@ -1,4 +1,3 @@
-
 const { QdrantClient } = require("@qdrant/js-client-rest");
 
 const qdrant = new QdrantClient({
@@ -15,7 +14,6 @@ qdrant.createCollectionIfNeeded = async () => {
         );
 
         if (exists) {
-            console.log("Qdrant collection verified");
             return;
         }
 
@@ -25,9 +23,8 @@ qdrant.createCollectionIfNeeded = async () => {
                 distance: "Cosine",
             },
         });
-        console.log("Qdrant collection created");
     } catch (err) {
-        console.log("ℹ️ Qdrant is offline; application is operating in database-fallback mode.");
+        // Qdrant is optional; backend smoothly operates with PostgreSQL fallback
     }
 };
 

@@ -1,4 +1,3 @@
-
 const prisma = require("../config/database");
 const { deleteDocumentInternal } = require("./documentController");
 
@@ -47,15 +46,15 @@ const getAll = async (req, res) => {
 
 const deleteWorkspaceInternal = async (workspaceId) => {
     const docs = await prisma.document.findMany({
-        where: { workspaceId }
+        where: { workspaceId },
     });
-    
+
     for (const doc of docs) {
         await deleteDocumentInternal(doc.id);
     }
-    
+
     return await prisma.workspace.delete({
-        where: { id: workspaceId }
+        where: { id: workspaceId },
     });
 };
 
@@ -64,20 +63,20 @@ const remove = async (req, res) => {
         const { workspaceId } = req.params;
         const workspace = await prisma.workspace.findUnique({
             where: { id: workspaceId },
-            include: { organization: true }
+            include: { organization: true },
         });
 
         if (!workspace) {
             return res.status(404).json({
                 success: false,
-                message: "Workspace not found"
+                message: "Workspace not found",
             });
         }
 
         if (workspace.organization.ownerId !== req.user.id) {
             return res.status(403).json({
                 success: false,
-                message: "Unauthorized: You do not own this organization"
+                message: "Unauthorized: You do not own this organization",
             });
         }
 
@@ -85,12 +84,13 @@ const remove = async (req, res) => {
 
         res.status(200).json({
             success: true,
-            message: "Workspace deleted successfully"
+            message: "Workspace deleted successfully",
         });
+
     } catch (err) {
         res.status(400).json({
             success: false,
-            message: err.message
+            message: err.message,
         });
     }
 };

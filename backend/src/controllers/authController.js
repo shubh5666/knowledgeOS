@@ -1,5 +1,5 @@
-const prisma = require("../config/database");
 const bcrypt = require("bcrypt");
+const prisma = require("../config/database");
 const { validateSignupData, validateLoginData } = require("../utils/validation");
 const { generateToken } = require("../utils/jwt");
 
@@ -14,7 +14,7 @@ const signup = async (req, res) => {
         });
 
         if (existingUser) {
-            throw new Error("User already exists");
+            throw new Error("User with this email already exists");
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -90,7 +90,15 @@ const login = async (req, res) => {
     }
 };
 
+const getProfile = async (req, res) => {
+    res.status(200).json({
+        success: true,
+        data: req.user,
+    });
+};
+
 module.exports = {
     signup,
     login,
+    getProfile,
 };

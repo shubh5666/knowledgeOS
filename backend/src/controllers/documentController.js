@@ -1,15 +1,49 @@
 const fs = require("fs");
 const prisma = require("../config/database");
-const { extractText } = require("../utils/pdfParser");
+const { extractText, resolveFilePath } = require("../utils/pdfParser");
 const ai = require("../config/gemini");
 const qdrant = require("../config/qdrant");
 
-const chunkText = (text) => {
-    const CHUNK_SIZE = 500;
-    const chunks = [];
-    for (let i = 0; i < text.length; i += CHUNK_SIZE) {
-        chunks.push(text.slice(i, i + CHUNK_SIZE));
+/**
+ * Splits text into meaningful semantic chunks with overlap.
+ * Small documents (e.g. marksheets/certificates <= 1500 chars) are kept intact
+ * so all associated fields remain in the same retrieval context.
+ */
+const chunkText = (text, chunkSize = 800, overlap = 150) => {
+    if (!text || typeof text !== "string") return [];
+    const trimmed = text.trim();
+    if (trimmed.length === 0) return [];
+
+    if (trimmed.length <= 1500) {
+        return [trimmed];
     }
+
+    const chunks = [];
+    let start = 0;
+    while (start < trimmed.length) {
+        let end = start + chunkSize;
+        if (end >= trimmed.length) {
+            chunks.push(trimmed.slice(start).trim());
+            break;
+        }
+
+        // Break on paragraph newline or sentence end when feasible
+        let boundary = trimmed.lastIndexOf("\n", end);
+        if (boundary <= start || boundary < end - 200) {
+            boundary = trimmed.lastIndexOf(". ", end);
+        }
+        if (boundary > start && boundary >= end - 250) {
+            end = boundary + 1;
+        }
+
+        const chunk = trimmed.slice(start, end).trim();
+        if (chunk.length > 0) {
+            chunks.push(chunk);
+        }
+
+        start = Math.max(start + 1, end - overlap);
+    }
+
     return chunks;
 };
 
@@ -19,7 +53,7 @@ const generateEmbedding = async (text) => {
         contents: text,
         config: {
             outputDimensionality: 768,
-        }
+        },
     });
     return response.embeddings[0].values;
 };
@@ -28,6 +62,13 @@ const upload = async (req, res) => {
     try {
         const { workspaceId } = req.params;
         const file = req.file;
+
+        if (!file) {
+            return res.status(400).json({
+                success: false,
+                message: "No file provided for upload",
+            });
+        }
 
         const document = await prisma.document.create({
             data: {
@@ -39,7 +80,8 @@ const upload = async (req, res) => {
             },
         });
 
-        const text = await extractText(file.path);
+        // Universal extraction: handles both text PDFs and scanned/image PDFs via OCR
+        const text = await extractText(file.path, file.mimetype);
         const chunks = chunkText(text);
 
         for (let i = 0; i < chunks.length; i++) {
@@ -68,33 +110,60 @@ const upload = async (req, res) => {
 const processDocument = async (req, res) => {
     try {
         const { documentId } = req.params;
-        const chunks = await prisma.documentChunk.findMany({
+        let chunks = await prisma.documentChunk.findMany({
             where: { documentId },
             orderBy: { chunkIndex: "asc" },
         });
 
-        // Optimize: Generate embeddings in parallel and batch-upsert points to Qdrant
-        const embeddings = await Promise.all(
-            chunks.map(chunk => generateEmbedding(chunk.content))
-        );
+        // Self-healing: if chunks are missing or empty, extract and chunk text
+        const hasValidText = chunks.some((c) => c.content && c.content.trim().length > 10);
+        if (chunks.length === 0 || !hasValidText) {
+            const document = await prisma.document.findUnique({ where: { id: documentId } });
+            if (document) {
+                const resolved = resolveFilePath(document.filePath);
+                if (fs.existsSync(resolved)) {
+                    await prisma.documentChunk.deleteMany({ where: { documentId } });
+                    const extracted = await extractText(resolved, document.fileType);
+                    const newChunks = chunkText(extracted);
+                    for (let i = 0; i < newChunks.length; i++) {
+                        await prisma.documentChunk.create({
+                            data: {
+                                content: newChunks[i],
+                                chunkIndex: i,
+                                documentId: document.id,
+                            },
+                        });
+                    }
+                    chunks = await prisma.documentChunk.findMany({
+                        where: { documentId },
+                        orderBy: { chunkIndex: "asc" },
+                    });
+                }
+            }
+        }
 
-        const points = chunks.map((chunk, index) => ({
-            id: chunk.id,
-            vector: embeddings[index],
-            payload: {
-                documentId: chunk.documentId,
-                chunkIndex: chunk.chunkIndex,
-                content: chunk.content,
-            },
-        }));
-
+        // Vectorize and index points into Qdrant if available
         try {
+            const embeddings = await Promise.all(
+                chunks.map((chunk) => generateEmbedding(chunk.content))
+            );
+
+            const points = chunks.map((chunk, index) => ({
+                id: chunk.id,
+                vector: embeddings[index],
+                payload: {
+                    documentId: chunk.documentId,
+                    chunkIndex: chunk.chunkIndex,
+                    content: chunk.content,
+                },
+            }));
+
             await qdrant.upsert("document_chunks", {
                 wait: true,
                 points,
             });
         } catch (qdrantErr) {
-            console.warn("⚠️ Warning: Qdrant upsert failed, continuing with database chunks:", qdrantErr.message);
+            console.warn("⚠️ Qdrant indexing skipped (offline fallback active):", qdrantErr.message);
         }
 
         await prisma.document.update({
@@ -148,25 +217,26 @@ const deleteDocumentInternal = async (documentId) => {
         where: { documentId },
     });
 
-    // Delete vectors in Qdrant
+    // Delete vectors in Qdrant if online
     for (const chunk of chunks) {
         try {
             await qdrant.delete("document_chunks", {
                 points: [chunk.id],
             });
         } catch (error) {
-            console.error("Warning: Failed to delete vector point from Qdrant:", error.message);
+            // Gracefully ignore if Qdrant is offline
         }
     }
 
-    // Delete references in Prisma
+    // Delete database records
     await prisma.documentChunk.deleteMany({ where: { documentId } });
     await prisma.chat.deleteMany({ where: { documentId } });
     await prisma.document.delete({ where: { id: documentId } });
 
-    // Unlink the file from disk
-    if (fs.existsSync(document.filePath)) {
-        fs.unlinkSync(document.filePath);
+    // Remove file from disk
+    const resolved = resolveFilePath(document.filePath);
+    if (fs.existsSync(resolved)) {
+        fs.unlinkSync(resolved);
     }
 };
 
@@ -188,6 +258,8 @@ const removeDocument = async (req, res) => {
 };
 
 module.exports = {
+    chunkText,
+    generateEmbedding,
     upload,
     processDocument,
     getAllDocuments,

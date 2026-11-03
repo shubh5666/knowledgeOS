@@ -1,4 +1,3 @@
-
 const prisma = require("../config/database");
 
 const dashboard = async (req, res) => {

@@ -1,11 +1,8 @@
-
 const jwt = require("jsonwebtoken");
 const prisma = require("../config/database");
 
 const auth = async (req, res, next) => {
-
     try {
-
         const authHeader = req.headers.authorization;
 
         if (!authHeader) {
@@ -34,20 +31,15 @@ const auth = async (req, res, next) => {
             throw new Error("User not found");
         }
 
-      console.log("Logged in User:", user);
         req.user = user;
-
         next();
 
     } catch (err) {
-
         res.status(401).json({
             success: false,
             message: err.message,
         });
-
     }
-
 };
 
 module.exports = auth;
